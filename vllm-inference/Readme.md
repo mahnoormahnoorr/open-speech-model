@@ -4,7 +4,9 @@ Script to run https://huggingface.co/openai/whisper-large-v3 vLLM using 4 GPUs o
 
 Note: all script are Slurm batch job scripts and need to be submitted with sbatch, for example:
 
+```
 sbatch run-vllm-lumi4.sh
+```
 
 While the job is running, you can connect connect to the vLLM server with a process on the same node via that node. For example, the following opens a terminal on the node running vLLM and sends a request via the cURL command line tool:
 
