@@ -14,7 +14,9 @@ run-vllm-process.sh    # Script that runs vllm serve
 
 Submit the slurm job with: 
 
+```
 sbatch run-vllm-lumi4.sh
+```
 
 When the job is running, open an interactive shell on compute node and send an audio fle to the vLLM transcription endpoints:
 
