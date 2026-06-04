@@ -8,7 +8,7 @@ sbatch run-vllm-lumi4.sh
 
 While the job is running, you can connect connect to the vLLM server with a process on the same node via that node. For example, the following opens a terminal on the node running vLLM and sends a request via the cURL command line tool:
 
-
+```
 username@login-node$ srun --overlap --jobid <slurm-job-id> --pty bash
 
 username@compute-node$ curl -X POST "http://127.0.0.1:8000/v1/au
@@ -18,7 +18,7 @@ dio/transcriptions" \
 v" \
 >   -F "model=openai/whisper-large-v3" \
 >   -F "response_format=text"
-
+```
 
 
 # Audio Transcription Using vLLM on LUMI
