@@ -19,7 +19,7 @@ OUTPUT_JSON=/scratch/project_462001302/mmahnoor/vllm/openai/diarized_output.json
 
 set -xv
 
-srun singularity exec "$SIF" python inference-openai-diarize.py \
+srun singularity exec "$SIF" python inference-gemini.py \
   --model gpt-4o-transcribe-diarize \
   --audio "$AUDIO_FILE" \
   --output-json "$OUTPUT_JSON"
