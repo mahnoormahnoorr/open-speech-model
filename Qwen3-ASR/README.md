@@ -1,4 +1,4 @@
-# Fine-tuning Qwen3-ASR for Finnish on LUMI (AMD ROCm)
+# Fine-tuning Qwen3-ASR for Finnish speech data on LUMI 
  
 This repo documents fine-tuning [Qwen3-ASR-1.7B](https://github.com/QwenLM/Qwen3-ASR) on Finnish speech data using [LUMI](https://www.lumi-supercomputer.eu/), a EuroHPC supercomputer with AMD MI250x GPUs (ROCm), via the LUMI AI Factory container stack.
  
