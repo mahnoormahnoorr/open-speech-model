@@ -13,10 +13,10 @@ This repo documents fine-tuning [Qwen3-ASR-1.7B](https://github.com/QwenLM/Qwen3
 | File | Purpose |
 |------|---------|
 | `prep_audio.py` | Downloads FLEURS Finnish data from Hugging Face, decodes audio, writes `data/{train,validation}.jsonl` + `.wav` files |
-| `fine_tune_sqen_asr_rocm.py` | Main fine-tuning script — custom data collator, prefix/target masking, ROCm-adapted bf16 detection |
-| `infer_qwen3_asr.py` | Runs transcription on validation audio using a given checkpoint, prints predicted vs. gold text |
-| `lumi.sh` | SLURM script: launches fine-tuning across 8 GPUs via `torchrun` |
-| `infer_lumi.sh` | SLURM script: launches inference test on 1 GPU |
+| `finetuning.py` | Main fine-tuning script — custom data collator, prefix/target masking, ROCm-adapted bf16 detection |
+| `inference-demo.py` | Runs transcription on validation audio using a given checkpoint, prints predicted vs. gold text |
+| `run-finetuning-lumi-gpu8.sh` | SLURM script: launches fine-tuning across 8 GPUs via `torchrun` |
+| `run-inference-lumi.sh` | SLURM script: launches inference test on 1 GPU |
  
 ## Setup
  
