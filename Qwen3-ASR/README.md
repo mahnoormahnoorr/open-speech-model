@@ -64,12 +64,3 @@ language Finnish<asr_text>Hyönteiset olivat ensimmäisiä eläimiä.
 ```
  
 This marker (`language <Lang><asr_text>`) is required per the official fine-tuning spec — it's the boundary token sequence the pretrained model uses to know the prompt has ended and transcription should begin.
- 
-## Known issues encountered on LUMI / ROCm
- 
-- **`qwen-asr` requires `transformers==4.57.6` exactly.** The LAIF container ships a newer `transformers` (5.x) system-wide; a venv built with `--system-site-packages` can silently shadow your pinned version unless `PYTHONPATH` explicitly prioritizes the venv's own `site-packages` over `/opt/venv/lib/.../site-packages`.
-- **Apptainer's `--cleanenv`-style wrapping** (via the `lumi-aif-singularity-bindings` module) means plain `export PYTHONPATH=...` on the host does not reliably reach the container. `APPTAINERENV_PYTHONPATH=...` or `singularity run --env PYTHONPATH=...` (properly quoted) are the mechanisms that actually work.
-- **Do not use `--rocm`** with this specific container — it bundles its own self-contained ROCm 7.0 userspace; binding the host's older ROCm 6.3.4 libraries on top causes `undefined symbol` crashes. The `lumi-aif-singularity-bindings` module already handles device access correctly without it.
-- **`qwen_asr`'s bundled `modeling_qwen3_asr.py`** uses `@check_model_inputs()` (parens) which breaks under some `transformers` versions expecting the non-factory form (`@check_model_inputs`, no parens) — a one-line `sed` patch fixes this if it recurs.
-- **`Qwen3ASRModel.from_pretrained(...)`'s `thinker_config` `AttributeError`** appears whenever `transformers` drifts away from `4.57.6` — always re-check `python -c "import transformers; print(transformers.__version__)"` if this resurfaces.
-- **Checkpoints saved mid-training are missing files** (`preprocessor_config.json`, `chat_template.json`, etc.) if `--model_path` was passed as a bare HF repo id (e.g. `Qwen/Qwen3-ASR-1.7B`) rather than a resolved local path — the checkpoint-fixing callback's `os.path.join` silently fails to find files to copy. Workaround: copy the missing files manually from the resolved HF cache snapshot (`$HF_HOME/hub/models--Qwen--Qwen3-ASR-1.7B/snapshots/<hash>/`) before running inference.
