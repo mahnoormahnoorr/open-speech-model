@@ -1,0 +1,17 @@
+# Slurm output files (default names: slurm-<jobid>.out / .err)
+slurm-*.out
+slurm-*.err
+
+# Python virtual environments
+venv/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Preprocessed data and fine-tuning outputs
+Qwen3-ASR/data/
+Qwen3-ASR/outputs/
+
+# Core dumps from crashed processes
+core
+core.*
