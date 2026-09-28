@@ -306,7 +306,8 @@ def main():
         train_dataset=ds["train"],
         eval_dataset=ds.get("validation", None),
         data_collator=collator,
-        tokenizer=processor.tokenizer,
+        #tokenizer=processor.tokenizer,
+        processing_class=processor,
         callbacks=[MakeEveryCheckpointInferableCallback(base_model_path=args_cli.model_path)],
     )
 
