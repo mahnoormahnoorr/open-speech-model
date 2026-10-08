@@ -1,6 +1,7 @@
 # Slurm output files (default names: slurm-<jobid>.out / .err)
 slurm-*.out
 slurm-*.err
+logs/
 
 # Python virtual environments
 venv/
@@ -11,6 +12,7 @@ venv/
 # Preprocessed data and fine-tuning outputs
 Qwen3-ASR/data/
 Qwen3-ASR/outputs/
+asr/
 
 # Core dumps from crashed processes
 core
