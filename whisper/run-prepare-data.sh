@@ -1,23 +1,24 @@
 #!/bin/bash
 #SBATCH --account=project_462000131
-#SBATCH --partition=dev-g
+#SBATCH --partition=debug
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=7
-#SBATCH --mem=60G
-#SBATCH --time=00:30:00
-#SBATCH --job-name=asr-inference
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=00:20:00
+#SBATCH --job-name=asr-prepare
 #SBATCH --output=logs/%x-%j.out
 #
-# STEP 6: Transcribe your own audio (any format; long recordings are chunked).
+# STEP 2: Download a dataset and convert it to the format all scripts use.
+# Runs on a CPU node (no GPU billing).
 #
-#   sbatch run-inference-lumi.sh --model whisper-large-v3-turbo-fi --language fi \
-#       --audio /scratch/project_462XXXXXX/my_audio/
+#   sbatch run-prepare-data-lumi.sh --language fi      # -> data name: fleurs-fi
+#   sbatch run-prepare-data-lumi.sh --language en      # -> data name: fleurs-en
 #
-# Transcripts are shown in the log; add --output_file transcripts.jsonl to also
-# save all of them. Try it quickly with --quick (3 files or sentences).
-# More options: see the top of inference.py
+# This takes only a few minutes; the other steps' --quick option then uses just
+# part of the data, so there is no separate quick dataset.
+#
+# More options (your own data etc.): see the top of prepare_data.py
 
 # ---- Setup (the same in every script; you normally don't need to change it) ----
 # The container that provides Python, PyTorch (ROCm) and Transformers:
@@ -44,4 +45,4 @@ echo "Results in : $WORK"
 echo "Arguments  : ${*:-(none)}"
 echo "=========="
 
-singularity exec -B $BINDS $SIF python inference.py "$@"
+singularity exec -B $BINDS $SIF python prepare_data.py "$@"

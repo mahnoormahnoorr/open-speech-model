@@ -6,28 +6,22 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=7
 #SBATCH --mem=60G
-#SBATCH --time=00:30:00
-#SBATCH --job-name=asr-compare
+#SBATCH --time=01:00:00
+#SBATCH --job-name=whisper-finetune-gpu1
 #SBATCH --output=logs/%x-%j.out
 #
-# STEP 3 and 5: Run one or more models on the same test data and compare them.
-# Produces a summary (WER, CER, speed) and side_by_side.tsv with every
-# sentence: the correct text and each model's transcript.
+# STEP 4: Fine-tune Whisper on prepared data (1 GPU).
 #
-#   # Two ready models on English (Qwen3-ASR support arrives in the next update)
-#   sbatch run-compare-lumi.sh --data fleurs-en \
-#       --models openai/whisper-large-v3-turbo Qwen/Qwen3-ASR-1.7B
+#   sbatch run-finetune-lumi-gpu1.sh --data fleurs-fi
+#   sbatch run-finetune-lumi-gpu1.sh --data fleurs-fi --model openai/whisper-small
 #
-#   # Ready model vs your fine-tuned version on Finnish
-#   sbatch run-compare-lumi.sh --data fleurs-fi \
-#       --models openai/whisper-large-v3-turbo whisper-large-v3-turbo-fi
+#   # Try it quickly: Whisper-small, first 64 sentences, 30 steps -> whisper-small-fi-quick
+#   sbatch run-finetune-lumi-gpu1.sh --data fleurs-fi --quick
 #
-#   # Try it quickly: first 32 sentences, your '-quick' fine-tuned models
-#   sbatch run-compare-lumi.sh --data fleurs-fi \
-#       --models openai/whisper-small whisper-small-fi --quick
-#
-# Results: /scratch/<project>/$USER/asr/runs/comparisons/<name>/
-# More options: see the top of compare.py
+# The model is saved under the name <model>-<language>, e.g.
+# whisper-large-v3-turbo-fi, which you then use with run-compare-lumi.sh and
+# run-inference-lumi.sh. Training progress (loss, validation WER) is in the log.
+# More options: see the top of finetune_whisper.py
 
 # ---- Setup (the same in every script; you normally don't need to change it) ----
 # The container that provides Python, PyTorch (ROCm) and Transformers:
@@ -54,4 +48,10 @@ echo "Results in : $WORK"
 echo "Arguments  : ${*:-(none)}"
 echo "=========="
 
-singularity exec -B $BINDS $SIF python compare.py "$@"
+# Which Whisper model to fine-tune. Change it here, or give --model on the
+# sbatch line (that wins). Smaller and faster: openai/whisper-small
+MODEL=openai/whisper-large-v3-turbo
+# With --quick the small model is used instead, so trying it out is fast.
+if [[ " $* " == *" --quick "* ]]; then MODEL=openai/whisper-small; fi
+
+singularity exec -B $BINDS $SIF python finetune_whisper.py --model $MODEL --num_workers 6 "$@"

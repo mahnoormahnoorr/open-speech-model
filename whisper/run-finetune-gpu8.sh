@@ -1,24 +1,28 @@
 #!/bin/bash
 #SBATCH --account=project_462000131
-#SBATCH --partition=debug
+#SBATCH --partition=dev-g
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
-#SBATCH --time=00:20:00
-#SBATCH --job-name=asr-prepare
+#SBATCH --gpus-per-node=8
+#SBATCH --cpus-per-task=56
+#SBATCH --mem=480G
+#SBATCH --time=02:00:00
+#SBATCH --job-name=whisper-finetune-gpu8
 #SBATCH --output=logs/%x-%j.out
 #
-# STEP 2: Download a dataset and convert it to the format all scripts use.
-# Runs on a CPU node (no GPU billing).
+# Fine-tune Whisper on one full node (8 GPUs). Same as run-finetune-lumi-gpu1.sh,
+# but faster for large datasets.
 #
-#   sbatch run-prepare-data-lumi.sh --language fi      # -> data name: fleurs-fi
-#   sbatch run-prepare-data-lumi.sh --language en      # -> data name: fleurs-en
+#   sbatch run-finetune-lumi-gpu8.sh --data fleurs-fi --batch_size 4
 #
-# This takes only a few minutes; the other steps' --quick option then uses just
-# part of the data, so there is no separate quick dataset.
+# The effective batch size is batch_size x grad_acc x 8. For small datasets
+# like FLEURS (~2,700 sentences) keep it low (e.g. --batch_size 4 -> 32),
+# otherwise there are too few training steps.
 #
-# More options (your own data etc.): see the top of prepare_data.py
+# The model is saved under the name <model>-<language>, e.g.
+# whisper-large-v3-turbo-fi, which you then use with run-compare-lumi.sh and
+# run-inference-lumi.sh. Training progress (loss, validation WER) is in the log.
+# More options: see the top of finetune_whisper.py
 
 # ---- Setup (the same in every script; you normally don't need to change it) ----
 # The container that provides Python, PyTorch (ROCm) and Transformers:
@@ -45,4 +49,11 @@ echo "Results in : $WORK"
 echo "Arguments  : ${*:-(none)}"
 echo "=========="
 
-singularity exec -B $BINDS $SIF python prepare_data.py "$@"
+# Which Whisper model to fine-tune. Change it here, or give --model on the
+# sbatch line (that wins). Smaller and faster: openai/whisper-small
+MODEL=openai/whisper-large-v3-turbo
+# With --quick the small model is used instead, so trying it out is fast.
+if [[ " $* " == *" --quick "* ]]; then MODEL=openai/whisper-small; fi
+
+singularity exec -B $BINDS $SIF python -m torch.distributed.run --standalone --nproc_per_node=8 \
+    finetune_whisper.py --model $MODEL --num_workers 6 "$@"
