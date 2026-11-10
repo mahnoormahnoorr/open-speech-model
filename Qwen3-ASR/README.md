@@ -8,16 +8,7 @@ This repo documents fine-tuning [Qwen3-ASR-1.7B](https://github.com/QwenLM/Qwen3
 - **Hardware:** LUMI `dev-g` partition, 8x AMD MI250x GCDs per node
 - **Data:** Google FLEURS Finnish subset (`fi_fi`) — ~2,700 train / ~415 validation examples, ~8.8 hours of audio
 - **Container:** LUMI AI Factory `lumi-multitorch-full` image (PyTorch + ROCm 7.0 + DeepSpeed + vLLM bundled)
-## Files
- 
-| File | Purpose |
-|------|---------|
-| `prep_audio.py` | Downloads FLEURS Finnish data from Hugging Face, decodes audio, writes `data/{train,validation}.jsonl` + `.wav` files |
-| `finetuning.py` | Main fine-tuning script — custom data collator, prefix/target masking, ROCm-adapted bf16 detection |
-| `inference-demo.py` | Runs transcription on validation audio using a given checkpoint, prints predicted vs. gold text |
-| `run-finetuning-lumi-gpu8.sh` | SLURM script: launches fine-tuning across 8 GPUs via `torchrun` |
-| `run-inference-lumi.sh` | SLURM script: launches inference test on 1 GPU |
- 
+
 ## Setup
  
 ```bash
