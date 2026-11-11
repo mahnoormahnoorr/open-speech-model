@@ -26,3 +26,6 @@ srun singularity run --env PYTHONPATH=$PYTHONPATH:\$PYTHONPATH ${SIF} bash -c "
     --eval_file data/validation.jsonl \
     --num_examples 5
 "
+
+
+python qwenmodel.py  --model_path Qwen/Qwen3-ASR-1.7B --train_file data/train.jsonl   --eval_file data/validation.jsonl   --output_dir runs/qwen3-asr-fi   --batch_size 4   --grad_acc 8   --lr 2e-5   --epochs 3   --save_steps 50   --save_total_limit 5   --num_workers 6
