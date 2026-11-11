@@ -2,9 +2,17 @@
 # Copyright 2026 The Alibaba Qwen team.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Adapted for AMD ROCm / LUMI: replaces the CUDA compute-capability bf16
-# check (meaningless on ROCm) with a straight availability check, since
-# MI250x GCDs support bf16 natively. No other logic changed.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import argparse
 import os
 import re
@@ -85,7 +93,7 @@ def build_prefix_messages(prompt: str, audio_array):
     ]
 
 
-def make_preprocess_fn_prefix_only(processor, language: str = "Finnish"):
+def make_preprocess_fn_prefix_only(processor):
     def _preprocess(ex: Dict[str, Any]) -> Dict[str, Any]:
         prompt = ex.get("prompt", "")
         dummy_audio = None
@@ -96,7 +104,7 @@ def make_preprocess_fn_prefix_only(processor, language: str = "Finnish"):
         return {
             "prompt": prompt,
             "audio": ex["audio"],
-            "target": f"language {language}<asr_text>{ex['text']}",
+            "target": ex["text"],
             "prefix_text": prefix_text,
         }
 
@@ -193,14 +201,13 @@ class MakeEveryCheckpointInferableCallback(TrainerCallback):
 
 
 def parse_args():
-    p = argparse.ArgumentParser("Qwen3-ASR Finetuning (ROCm/LUMI)")
+    p = argparse.ArgumentParser("Qwen3-ASR Finetuning")
 
     # Paths
     p.add_argument("--model_path", type=str, default="Qwen/Qwen3-ASR-1.7B")
     p.add_argument("--train_file", type=str, default="train.jsonl")
     p.add_argument("--eval_file", type=str, default="")
     p.add_argument("--output_dir", type=str, default="./qwen3-asr-finetuning-out")
-    p.add_argument("--language", type=str, default="Finnish")
 
     # Audio
     p.add_argument("--sr", type=int, default=16000)
@@ -238,13 +245,7 @@ def main():
     if not args_cli.train_file:
         raise ValueError("TRAIN_FILE is required (json/jsonl). Needs fields: audio, text, optional prompt")
 
-    # --- ROCm/LUMI change -------------------------------------------------
-    # The original CUDA compute-capability check (>= 8, i.e. Ampere+) has no
-    # meaning under ROCm. MI250x GCDs support bf16 natively, so just check
-    # availability instead.
-    use_bf16 = torch.cuda.is_available()
-    # -----------------------------------------------------------------------
-
+    use_bf16 = torch.cuda.is_available() and torch.cuda.get_device_capability(0)[0] >= 8
     asr_wrapper = Qwen3ASRModel.from_pretrained(
         args_cli.model_path,
         dtype=torch.bfloat16 if use_bf16 else torch.float16,
@@ -263,7 +264,7 @@ def main():
             **({"validation": args_cli.eval_file} if args_cli.eval_file else {}),
         },
     )
-    ds = raw_ds.map(make_preprocess_fn_prefix_only(processor, language=args_cli.language), num_proc=1)
+    ds = raw_ds.map(make_preprocess_fn_prefix_only(processor), num_proc=1)
 
     keep = {"prompt", "audio", "target", "prefix_text"}
     for split in ds.keys():
@@ -306,8 +307,7 @@ def main():
         train_dataset=ds["train"],
         eval_dataset=ds.get("validation", None),
         data_collator=collator,
-        #tokenizer=processor.tokenizer,
-        processing_class=processor,
+        tokenizer=processor.tokenizer,
         callbacks=[MakeEveryCheckpointInferableCallback(base_model_path=args_cli.model_path)],
     )
 
