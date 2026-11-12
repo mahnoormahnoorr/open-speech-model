@@ -86,7 +86,7 @@ Training can be resumed from checkpoints if required. Add argument `--resume 1` 
 ### Run inference
  
 ```bash
-sbatch infer_lumi.sh
+sbatch run-inference.sh
 ```
  
 
