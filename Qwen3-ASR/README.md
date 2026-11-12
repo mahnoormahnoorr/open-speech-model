@@ -69,7 +69,7 @@ Result: 2,704 train, 415 validation and 918 test utterances. The splits are disj
 ### Fine-tune (single GPU) 
  
 ```bash
-sbatch lumi.sh
+sbatch run-finetuning-lumi-gpu1.sh
 ```
 
 
