@@ -14,7 +14,7 @@ import torch
 from qwen_asr import Qwen3ASRModel
 
 p = argparse.ArgumentParser()
-p.add_argument("--model", default="runs/qwen3-asr-fi/checkpoint-250")
+p.add_argument("--model", default="runs/qwen33-asr-fi/checkpoint-250")
 p.add_argument("--test_file", default="data/test.jsonl")
 p.add_argument("--index", type=int, default=0, help="Which line of the test file to use (0 = first)")
 args = p.parse_args()
