@@ -33,7 +33,7 @@ python qwenmodel.py \
   --train_file data/train.jsonl \
   --eval_file data/validation.jsonl \
   --output_dir runs/qwen3-asr-fi \
-  --batch_size 4 \
+  --batch_size 8 \
   --grad_acc 8 \
   --lr 2e-5 \
   --epochs 3 \
