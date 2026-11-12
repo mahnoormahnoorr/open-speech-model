@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 import librosa
 import torch
 from datasets import load_dataset
+from huggingface_hub import snapshot_download
 from qwen_asr import Qwen3ASRModel
 from transformers import (GenerationConfig, Trainer, TrainerCallback,
                           TrainingArguments)
@@ -164,6 +165,13 @@ class CastFloatInputsTrainer(Trainer):
         return inputs
 
 
+# CHANGED: a Hugging Face repo id such as "Qwen/Qwen3-ASR-1.7B" is not a local folder, so the original copy step silently found no files. This resolves the repo id to the local folder in the Hugging Face cache (HF_HOME).
+def resolve_local_model_dir(model_path: str) -> str:
+    if os.path.isdir(model_path):
+        return model_path
+    return snapshot_download(model_path)
+
+
 def copy_required_hf_files_for_qwen_asr(src_dir: str, dst_dir: str):
     os.makedirs(dst_dir, exist_ok=True)
     required = [
@@ -180,9 +188,11 @@ def copy_required_hf_files_for_qwen_asr(src_dir: str, dst_dir: str):
     ]
     for fn in required:
         src = os.path.join(src_dir, fn)
-        if os.path.exists(src):
-            shutil.copy2(src, os.path.join(dst_dir, fn))
-
+        dst = os.path.join(dst_dir, fn)
+        # CHANGED: only fill in missing files; never overwrite what the
+        # Trainer saved for the fine-tuned model (e.g. config.json).
+        if os.path.exists(src) and not os.path.exists(dst):
+            shutil.copy2(src, dst)
 
 class MakeEveryCheckpointInferableCallback(TrainerCallback):
     def __init__(self, base_model_path: str):
@@ -253,6 +263,7 @@ def main():
     )
     model = asr_wrapper.model
     processor = asr_wrapper.processor
+    base_model_dir = resolve_local_model_dir(args_cli.model_path)
 
     patch_outer_forward(model)
     model.generation_config = GenerationConfig.from_model_config(model.config)
@@ -307,8 +318,10 @@ def main():
         train_dataset=ds["train"],
         eval_dataset=ds.get("validation", None),
         data_collator=collator,
-        tokenizer=processor.tokenizer,
-        callbacks=[MakeEveryCheckpointInferableCallback(base_model_path=args_cli.model_path)],
+        # CHANGED: pass the full processor (tokenizer + audio feature extractor)
+        # so every checkpoint gets preprocessor_config.json too
+        processing_class=processor,
+        callbacks=[MakeEveryCheckpointInferableCallback(base_model_path=base_model_dir)],
     )
 
     resume_from = (args_cli.resume_from or "").strip()
@@ -321,6 +334,12 @@ def main():
         trainer.train(resume_from_checkpoint=resume_from)
     else:
         trainer.train()
+          # CHANGED: save a clean, ready-to-load final model in output_dir itself
+    # (weights + config + processor files, no optimizer state)
+    trainer.save_model(training_args.output_dir)
+    if trainer.is_world_process_zero():
+        copy_required_hf_files_for_qwen_asr(base_model_dir, training_args.output_dir)
+        print(f"[done] final model saved to {training_args.output_dir}")
 
 
 if __name__ == "__main__":
