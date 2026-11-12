@@ -61,7 +61,7 @@ Run it once per split:
 ```bash
 python prep_audio.py --split train --out_dir data
 python prep_audio.py --split validation --out_dir data
-python prep_audio.py --split test       --out_dir data
+python prep_audio.py --split test  --out_dir data
 ```
 
 Result: 2,704 train, 415 validation and 918 test utterances. The splits are disjoint. Training uses only `train`, `validation` is used for eval_loss during training, and `test` is kept for the final evaluation.
