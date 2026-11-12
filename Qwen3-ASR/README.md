@@ -84,6 +84,8 @@ sbatch run-finetuning-lumi-gpu8.sh
 Training can be resumed from checkpoints if required. Add argument `--resume 1` to automatically resume from latest checkpoint or `--resume_from ./qwen3-asr-finetuning-out/checkpoint-200` to resume from a checkpoint path.
 
 ### Run inference
+
+`run-inference.sh` transcribes audio from `test` dataset with a Qwen3-ASR model, fine-tuned one, and compares the output with reference transcripts. It reports word error rate (WER) and character error rate (CER).
  
 ```bash
 sbatch run-inference.sh
