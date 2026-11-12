@@ -78,9 +78,13 @@ sbatch run-finetuning-lumi-gpu1.sh
 sbatch run-finetuning-lumi-gpu8.sh
 ```
 
+In script `run-finetuning-lumi-gpu8.sh`, `--batch_size` is per GPU. When you change the number of GPUs, adjust `--grad_acc` to keep the effective batch the same. 
+
+Checkpoints are saved every `--save_steps steps` in the output folder.
+
 ### Resume training 
 
-Training can be resumed from checkpoints if required. Add argument `--resume 1` to automatically resume from latest checkpoint or `--resume_from ./qwen3-asr-finetuning-out/checkpoint-200` to resume from a checkpoint path.
+Training can be resumed from checkpoints. Add argument `--resume 1` to resume automatically from latest checkpoint or `--resume_from ./qwen3-asr-finetuning-out/checkpoint-200` to resume from a specific checkpoint.
 
 ### Run inference
 
