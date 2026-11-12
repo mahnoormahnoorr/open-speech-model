@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --account=project_462001302
-#SBATCH --partition=small-g
+#SBATCH --partition=dev-g
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=14
-#SBATCH --gpus-per-node=2
+#SBATCH --gpus-per-node=8
 #SBATCH --mem=120G
 #SBATCH --time=01:30:00
 
@@ -29,7 +29,7 @@ export TORCH_HOME="/scratch/${SLURM_JOB_ACCOUNT}/${USER}/torch_home"
 
 mkdir -p "$TORCH_HOME" "$HF_HOME"
 
-srun singularity run --env PYTHONPATH=$PYTHONPATH:\$PYTHONPATH $SIF bash -c 'torchrun --standalone --nnodes=1 --nproc_per_node=2 \
+srun singularity run --env PYTHONPATH=$PYTHONPATH:\$PYTHONPATH $SIF bash -c 'torchrun --standalone --nnodes=1 --nproc_per_node=8 \
   qwenmodel.py \
   --model_path Qwen/Qwen3-ASR-1.7B \
   --train_file data/train.jsonl \
