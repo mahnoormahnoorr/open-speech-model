@@ -1,12 +1,12 @@
-# Fine-tuning Qwen3-ASR for Finnish speech data on LUMI 
+# Fine-tuning Qwen3-ASR on Finnish speech data on LUMI 
  
 This repo documents fine-tuning [Qwen3-ASR-1.7B](https://github.com/QwenLM/Qwen3-ASR) on Finnish speech data using [LUMI](https://www.lumi-supercomputer.eu/), via the LUMI AI Factory container stack.
  
 ## Overview
  
 - **Base model:** `Qwen/Qwen3-ASR-1.7B`
-- **Hardware:** LUMI `dev-g` partition, 8x AMD MI250x GCDs per node
-- **Data:** Google FLEURS Finnish subset (`fi_fi`) — ~2,700 train / ~415 validation examples, ~8.8 hours of audio
+- **Hardware:** LUMIG partition, 8x AMD MI250X GCDs per node
+- **Data:** Google FLEURS Finnish subset (`fi_fi`) — train / validation / test data 
 - **Container:** LUMI AI Factory `lumi-multitorch-full` image (PyTorch + ROCm 7.0 + DeepSpeed + vLLM bundled)
 
 ## Setup
@@ -25,13 +25,13 @@ Apptainer> source venv/bin/activate
 
 Put your training data in a JSONL file (for example `train.jsonl`), with one JSON object per line. Each line describes one audio clip and needs two fields:
 
-`audio`: the path to your WAV file
-`text`: the transcript, starting with a language tag
+- `audio`: the path to your WAV file
+- `text`: the transcript, starting with a language tag
 
 Your file should look like this:
 
 
-```bash
+```json
 {"audio": "data/audio/train/0.wav", "text": "language Finnish<asr_text>Hyönteiset olivat ensimmäisiä eläimiä."}
 {"audio": "data/audio/train/1.wav", "text": "language Finnish<asr_text>Sää on tänään aurinkoinen."}
 {"audio": "data/audio/train/2.wav", "text": "language Finnish<asr_text>Tämä on harjoitusesimerkki."}
@@ -44,12 +44,11 @@ Start every transcript with `language <Lang><asr_text>`. Don’t skip this: `Qwe
 If you know the language of the clip, write its name in the tag, e.g. `language Finnish<asr_text>...` or `language English<asr_text>...`
 If you don’t know it, write `language None<asr_text>...`
 
-Tip: Clips tagged `None` don’t teach the model anything about language detection. If you want your fine-tuned model to recognise the language correctly, label as many clips as you can.
-
+> **Tip:** Clips tagged `None` don’t teach the model anything about language detection. If you want your fine-tuned model to recognise the language correctly, label as many clips as you can.
 
 `prep_audio.py` downloads FLEURS Finnish and writes one wav file per utterance plus a jsonl manifest. The corresponding write block in `prep_audio.py`: 
 
-```bash
+```python
 f.write(json.dumps({
     "audio": os.path.abspath(wav_path),
     "text": f"language Finnish<asr_text>{text}",
@@ -85,7 +84,7 @@ Training can be resumed from checkpoints if required. Add argument `--resume 1` 
 
 ### Run inference
 
-`run-inference.sh` is a slurm job script that runs inference.py on LUMI. It transcribes audio from in the test set (`data/test.jsonl`) with fine-tuned Qwen3-ASR model, compares the output with reference transcripts and reports word error rate (WER) and character error rate (CER).
+`run-inference.sh` is a Slurm job script that runs `inference.py` on LUMI. It transcribes the audio in the test set (`data/test.jsonl`) with a fine-tuned Qwen3-ASR model, compares the output with reference transcripts and reports word error rate (WER) and character error rate (CER).
 
 Submit the job from the repository folder:
 
