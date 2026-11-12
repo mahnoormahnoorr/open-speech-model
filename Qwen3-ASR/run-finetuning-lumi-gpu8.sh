@@ -36,7 +36,7 @@ srun singularity run --env PYTHONPATH=$PYTHONPATH:\$PYTHONPATH $SIF bash -c 'tor
   --eval_file data/validation.jsonl \
   --output_dir ./qwen3-asr-finetuning-out \
   --batch_size 4 \
-  --grad_acc 8 \
+  --grad_acc 2 \
   --lr 2e-5 \
   --epochs 3 \
   --save_steps 20'
