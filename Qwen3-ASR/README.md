@@ -75,6 +75,10 @@ sbatch run-finetuning-lumi-gpu1.sh
 
 ### Fine-tune (multi GPU with torch run) 
 
+```bash
+sbatch run-finetuning-lumi-gpu8.sh
+```
+
 ### Resume training 
 
 Training can be resumed from checkpoints if required. Add argument `--resume 1` to automatically resume from latest checkpoint or `--resume_from ./qwen3-asr-finetuning-out/checkpoint-200` to resume from a checkpoint path.
