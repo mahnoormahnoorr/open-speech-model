@@ -85,10 +85,15 @@ Training can be resumed from checkpoints if required. Add argument `--resume 1` 
 
 ### Run inference
 
-`run-inference.sh` transcribes audio from `test` dataset with a Qwen3-ASR model, fine-tuned one, and compares the output with reference transcripts. It reports word error rate (WER) and character error rate (CER).
+`run-inference.sh` is a slurm job script that runs inference.py on LUMI. It transcribes audio from in the test set (`data/test.jsonl`) with fine-tuned Qwen3-ASR model, compares the output with reference transcripts and reports word error rate (WER) and character error rate (CER).
+
+Submit the job from the repository folder:
+
  
 ```bash
 sbatch run-inference.sh
 ```
- 
+
+The model path and test file are set in the `python inference.py ...` line of `run-inference.sh`. Change them there to evaluate a different model or dataset.
+
 
