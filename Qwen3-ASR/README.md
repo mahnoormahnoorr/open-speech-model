@@ -16,9 +16,9 @@ module load Local-LAIF lumi-aif-singularity-bindings
 export SIF=/appl/local/laifs/containers/<lumi-multitorch-full-image>.sif
  
 singularity shell "$SIF"
-python -m venv venv --system-site-packages
-source venv/bin/activate
-pip install "transformers==4.57.6" "qwen-asr==0.0.6" datasets
+Apptainer> python -m venv venv --system-site-packages
+Apptainer> source venv/bin/activate
+(venv) Apptainer> pip install "transformers==4.57.6" "qwen-asr==0.0.6" datasets
 ```
 
 ## Prepare your training data 
