@@ -2,9 +2,17 @@
 # Copyright 2026 The Alibaba Qwen team.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Adapted for AMD ROCm / LUMI: replaces the CUDA compute-capability bf16
-# check (meaningless on ROCm) with a straight availability check, since
-# MI250x GCDs support bf16 natively. No other logic changed.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import argparse
 import os
 import re
@@ -15,6 +23,7 @@ from typing import Any, Dict, List, Optional
 import librosa
 import torch
 from datasets import load_dataset
+from huggingface_hub import snapshot_download
 from qwen_asr import Qwen3ASRModel
 from transformers import (GenerationConfig, Trainer, TrainerCallback,
                           TrainingArguments)
@@ -85,7 +94,7 @@ def build_prefix_messages(prompt: str, audio_array):
     ]
 
 
-def make_preprocess_fn_prefix_only(processor, language: str = "Finnish"):
+def make_preprocess_fn_prefix_only(processor):
     def _preprocess(ex: Dict[str, Any]) -> Dict[str, Any]:
         prompt = ex.get("prompt", "")
         dummy_audio = None
@@ -96,7 +105,7 @@ def make_preprocess_fn_prefix_only(processor, language: str = "Finnish"):
         return {
             "prompt": prompt,
             "audio": ex["audio"],
-            "target": f"language {language}<asr_text>{ex['text']}",
+            "target": ex["text"],
             "prefix_text": prefix_text,
         }
 
@@ -156,6 +165,13 @@ class CastFloatInputsTrainer(Trainer):
         return inputs
 
 
+# CHANGED: a Hugging Face repo id such as "Qwen/Qwen3-ASR-1.7B" is not a local folder, so the original copy step silently found no files. This resolves the repo id to the local folder in the Hugging Face cache (HF_HOME).
+def resolve_local_model_dir(model_path: str) -> str:
+    if os.path.isdir(model_path):
+        return model_path
+    return snapshot_download(model_path)
+
+
 def copy_required_hf_files_for_qwen_asr(src_dir: str, dst_dir: str):
     os.makedirs(dst_dir, exist_ok=True)
     required = [
@@ -172,9 +188,11 @@ def copy_required_hf_files_for_qwen_asr(src_dir: str, dst_dir: str):
     ]
     for fn in required:
         src = os.path.join(src_dir, fn)
-        if os.path.exists(src):
-            shutil.copy2(src, os.path.join(dst_dir, fn))
-
+        dst = os.path.join(dst_dir, fn)
+        # CHANGED: only fill in missing files; never overwrite what the
+        # Trainer saved for the fine-tuned model (e.g. config.json).
+        if os.path.exists(src) and not os.path.exists(dst):
+            shutil.copy2(src, dst)
 
 class MakeEveryCheckpointInferableCallback(TrainerCallback):
     def __init__(self, base_model_path: str):
@@ -193,14 +211,13 @@ class MakeEveryCheckpointInferableCallback(TrainerCallback):
 
 
 def parse_args():
-    p = argparse.ArgumentParser("Qwen3-ASR Finetuning (ROCm/LUMI)")
+    p = argparse.ArgumentParser("Qwen3-ASR Finetuning")
 
     # Paths
     p.add_argument("--model_path", type=str, default="Qwen/Qwen3-ASR-1.7B")
     p.add_argument("--train_file", type=str, default="train.jsonl")
     p.add_argument("--eval_file", type=str, default="")
     p.add_argument("--output_dir", type=str, default="./qwen3-asr-finetuning-out")
-    p.add_argument("--language", type=str, default="Finnish")
 
     # Audio
     p.add_argument("--sr", type=int, default=16000)
@@ -238,13 +255,7 @@ def main():
     if not args_cli.train_file:
         raise ValueError("TRAIN_FILE is required (json/jsonl). Needs fields: audio, text, optional prompt")
 
-    # --- ROCm/LUMI change -------------------------------------------------
-    # The original CUDA compute-capability check (>= 8, i.e. Ampere+) has no
-    # meaning under ROCm. MI250x GCDs support bf16 natively, so just check
-    # availability instead.
-    use_bf16 = torch.cuda.is_available()
-    # -----------------------------------------------------------------------
-
+    use_bf16 = torch.cuda.is_available() and torch.cuda.get_device_capability(0)[0] >= 8
     asr_wrapper = Qwen3ASRModel.from_pretrained(
         args_cli.model_path,
         dtype=torch.bfloat16 if use_bf16 else torch.float16,
@@ -252,6 +263,7 @@ def main():
     )
     model = asr_wrapper.model
     processor = asr_wrapper.processor
+    base_model_dir = resolve_local_model_dir(args_cli.model_path)
 
     patch_outer_forward(model)
     model.generation_config = GenerationConfig.from_model_config(model.config)
@@ -263,7 +275,7 @@ def main():
             **({"validation": args_cli.eval_file} if args_cli.eval_file else {}),
         },
     )
-    ds = raw_ds.map(make_preprocess_fn_prefix_only(processor, language=args_cli.language), num_proc=1)
+    ds = raw_ds.map(make_preprocess_fn_prefix_only(processor), num_proc=1)
 
     keep = {"prompt", "audio", "target", "prefix_text"}
     for split in ds.keys():
@@ -306,9 +318,10 @@ def main():
         train_dataset=ds["train"],
         eval_dataset=ds.get("validation", None),
         data_collator=collator,
-        #tokenizer=processor.tokenizer,
+        # CHANGED: pass the full processor (tokenizer + audio feature extractor)
+        # so every checkpoint gets preprocessor_config.json too
         processing_class=processor,
-        callbacks=[MakeEveryCheckpointInferableCallback(base_model_path=args_cli.model_path)],
+        callbacks=[MakeEveryCheckpointInferableCallback(base_model_path=base_model_dir)],
     )
 
     resume_from = (args_cli.resume_from or "").strip()
@@ -321,6 +334,12 @@ def main():
         trainer.train(resume_from_checkpoint=resume_from)
     else:
         trainer.train()
+          # CHANGED: save a clean, ready-to-load final model in output_dir itself
+    # (weights + config + processor files, no optimizer state)
+    trainer.save_model(training_args.output_dir)
+    if trainer.is_world_process_zero():
+        copy_required_hf_files_for_qwen_asr(base_model_dir, training_args.output_dir)
+        print(f"[done] final model saved to {training_args.output_dir}")
 
 
 if __name__ == "__main__":

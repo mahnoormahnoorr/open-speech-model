@@ -1,23 +1,14 @@
-# Fine-tuning Qwen3-ASR for Finnish speech data on LUMI 
+# Fine-tuning Qwen3-ASR on Finnish speech data on LUMI 
  
 This repo documents fine-tuning [Qwen3-ASR-1.7B](https://github.com/QwenLM/Qwen3-ASR) on Finnish speech data using [LUMI](https://www.lumi-supercomputer.eu/), via the LUMI AI Factory container stack.
  
 ## Overview
  
 - **Base model:** `Qwen/Qwen3-ASR-1.7B`
-- **Hardware:** LUMI `dev-g` partition, 8x AMD MI250x GCDs per node
-- **Data:** Google FLEURS Finnish subset (`fi_fi`) — ~2,700 train / ~415 validation examples, ~8.8 hours of audio
+- **Hardware:** LUMIG partition, 8x AMD MI250X GCDs per node
+- **Data:** Google FLEURS Finnish subset (`fi_fi`) — train / validation / test data 
 - **Container:** LUMI AI Factory `lumi-multitorch-full` image (PyTorch + ROCm 7.0 + DeepSpeed + vLLM bundled)
-## Files
- 
-| File | Purpose |
-|------|---------|
-| `prep_audio.py` | Downloads FLEURS Finnish data from Hugging Face, decodes audio, writes `data/{train,validation}.jsonl` + `.wav` files |
-| `finetuning.py` | Main fine-tuning script — custom data collator, prefix/target masking, ROCm-adapted bf16 detection |
-| `inference-demo.py` | Runs transcription on validation audio using a given checkpoint, prints predicted vs. gold text |
-| `run-finetuning-lumi-gpu8.sh` | SLURM script: launches fine-tuning across 8 GPUs via `torchrun` |
-| `run-inference-lumi.sh` | SLURM script: launches inference test on 1 GPU |
- 
+
 ## Setup
  
 ```bash
@@ -25,42 +16,87 @@ module load Local-LAIF lumi-aif-singularity-bindings
 export SIF=/appl/local/laifs/containers/<lumi-multitorch-full-image>.sif
  
 singularity shell "$SIF"
-python -m venv venv --system-site-packages
-source venv/bin/activate
-pip install "transformers==4.57.6" "qwen-asr==0.0.6" datasets
+Apptainer> python -m venv venv --system-site-packages
+Apptainer> source venv/bin/activate
+(venv) Apptainer> pip install "transformers==4.57.6" "qwen-asr==0.0.6" datasets
 ```
- 
-### Data prep
- 
+
+## Prepare your training data 
+
+Put your training data in a JSONL file (for example `train.jsonl`), with one JSON object per line. Each line describes one audio clip and needs two fields:
+
+- `audio`: the path to your WAV file
+- `text`: the transcript, starting with a language tag
+
+Your file should look like this:
+
+
+```json
+{"audio": "data/audio/train/0.wav", "text": "language Finnish<asr_text>Hyönteiset olivat ensimmäisiä eläimiä."}
+{"audio": "data/audio/train/1.wav", "text": "language Finnish<asr_text>Sää on tänään aurinkoinen."}
+{"audio": "data/audio/train/2.wav", "text": "language Finnish<asr_text>Tämä on harjoitusesimerkki."}
+```
+
+### Add the language tag
+
+Start every transcript with `language <Lang><asr_text>`. Don’t skip this: `Qwen3-ASR` uses this marker to know where the transcription begins.
+
+If you know the language of the clip, write its name in the tag, e.g. `language Finnish<asr_text>...` or `language English<asr_text>...`
+If you don’t know it, write `language None<asr_text>...`
+
+> **Tip:** Clips tagged `None` don’t teach the model anything about language detection. If you want your fine-tuned model to recognise the language correctly, label as many clips as you can.
+
+`prep_audio.py` downloads FLEURS Finnish and writes one wav file per utterance plus a jsonl manifest. The corresponding write block in `prep_audio.py`: 
+
+```python
+f.write(json.dumps({
+    "audio": os.path.abspath(wav_path),
+    "text": f"language Finnish<asr_text>{text}",
+}, ensure_ascii=False) + "\n")
+```
+
+Run it once per split:
+
 ```bash
 python prep_audio.py --split train --out_dir data
 python prep_audio.py --split validation --out_dir data
+python prep_audio.py --split test  --out_dir data
 ```
- 
-### Fine-tune
+
+Result: 2,704 train, 415 validation and 918 test utterances. The splits are disjoint. Training uses only `train`, `validation` is used for eval_loss during training, and `test` is kept for the final evaluation.
+
+### Fine-tune (single GPU) 
  
 ```bash
-sbatch lumi.sh
+sbatch run-finetuning-lumi-gpu1.sh
 ```
- 
-### Run inference on a checkpoint
+
+
+### Fine-tune (multi GPU with torch run) 
+
+```bash
+sbatch run-finetuning-lumi-gpu8.sh
+```
+
+In script `run-finetuning-lumi-gpu8.sh`, `--batch_size` is per GPU. When you change the number of GPUs, adjust `--grad_acc` to keep the effective batch the same. 
+
+Checkpoints are saved every `--save_steps steps` in the output folder.
+
+### Resume training 
+
+Training can be resumed from checkpoints. Add argument `--resume 1` to resume automatically from latest checkpoint or `--resume_from ./qwen3-asr-finetuning-out/checkpoint-200` to resume from a specific checkpoint.
+
+### Run inference
+
+`run-inference.sh` is a Slurm job script that runs `inference.py` on LUMI. It transcribes the audio in the test set (`data/test.jsonl`) with a fine-tuned Qwen3-ASR model, compares the output with reference transcripts and reports word error rate (WER) and character error rate (CER).
+
+Submit the job from the repository folder:
+
  
 ```bash
-sbatch infer_lumi.sh
+sbatch run-inference.sh
 ```
- 
-## Data format
- 
-Each line in `train.jsonl` / `validation.jsonl`:
- 
-```json
-{"audio": "data/audio/train/0.wav", "text": "Hyönteiset olivat ensimmäisiä eläimiä.", "prompt": "Transcribe the following Finnish audio."}
-```
- 
-The fine-tuning script transforms the target text into Qwen3-ASR's expected training format before computing loss:
- 
-```
-language Finnish<asr_text>Hyönteiset olivat ensimmäisiä eläimiä.
-```
- 
-This marker (`language <Lang><asr_text>`) is required per the official fine-tuning spec — it's the boundary token sequence the pretrained model uses to know the prompt has ended and transcription should begin.
+
+The model path and test file are set in the `python inference.py ...` line of `run-inference.sh`. Change them there to evaluate a different model or dataset.
+
+
