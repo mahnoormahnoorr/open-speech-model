@@ -1,13 +1,16 @@
 # Slurm output files (default names: slurm-<jobid>.out / .err)
+# Slurm logs (the folder itself is kept, Slurm needs it)
 slurm-*.out
 slurm-*.err
 logs/
+!logs/.gitkeep
 
 # Python virtual environments
 venv/
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
+__pycache__/
 
 # Preprocessed data and fine-tuning outputs
 Qwen3-ASR/data/
@@ -17,3 +20,4 @@ asr/
 # Core dumps from crashed processes
 core
 core.*
+
