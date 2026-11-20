@@ -1,0 +1,13 @@
+# Extra packages on top of the LUMI AI Factory container (which already has
+# PyTorch for ROCm, datasets, numpy, pandas, openai ...).
+# How to create the venv: see "Step 0" in README.md.
+transformers==4.57.6   # the version qwen-asr 0.0.6 is made for
+accelerate==1.12.0     # needed by transformers for training and device_map
+nagisa==0.2.11         # imported by qwen-asr
+jiwer                  # WER and CER
+soundfile              # reading and writing audio
+librosa                # decoding and resampling audio
+openai                 # AITTA API
+
+# qwen-asr itself is installed separately with --no-deps (see README.md):
+# its other dependencies (gradio, flask, sox, ...) are only for its web demo.
